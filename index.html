@@ -1,192 +1,28 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Liquid Glass Button</title>
-<style>
-html,body{
-  margin:0;
-  height:100%;
-  overflow:hidden;
-  background:linear-gradient(120deg,#0f2027,#203a43,#2c5364);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-canvas{
-  position:absolute;
-  inset:0;
-}
-button{
-  position:relative;
-  z-index:2;
-  width:220px;
-  height:64px;
-  background:transparent;
-  border:none;
-  color:white;
-  font-size:20px;
-  font-weight:600;
-  cursor:pointer;
-}
-</style>
+  <!-- スタイル -->
+  <link rel="stylesheet" href="path/to/styles.css">
+  <link rel="stylesheet" href="path/to/glass.css">
 </head>
 <body>
 
-<canvas id="gl"></canvas>
-<button id="btn">Liquid Glass</button>
+  <!-- html2canvas（必須） -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-<script>
-const canvas = document.getElementById("gl");
-const gl = canvas.getContext("webgl");
-const btn = document.getElementById("btn");
+  <!-- LiquidGlass 本体 -->
+  <script src="path/to/container.js"></script>
+  <script src="path/to/button.js"></script>
 
-function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-  gl.viewport(0,0,canvas.width,canvas.height);
-}
-addEventListener("resize",resize);
-resize();
-
-let hover = 0;
-btn.onmouseenter = ()=>hover=1;
-btn.onmouseleave = ()=>hover=0;
-
-const vs = `
-attribute vec2 p;
-varying vec2 v;
-void main(){
-  v = p*0.5+0.5;
-  gl_Position = vec4(p,0,1);
-}
-`;
-
-const fs = `
-precision highp float;
-uniform float t;
-uniform float h;
-uniform vec2 res;
-uniform vec4 btn; // x,y,w,h
-varying vec2 v;
-
-float noise(vec2 p){
-  return sin(p.x)*sin(p.y);
-}
-
-float roundedBox(vec2 uv, vec2 b, float r){
-  vec2 d = abs(uv) - b;
-  return length(max(d,0.0)) - r;
-}
-
-void main(){
-  vec2 uv = v;
-
-  // 背景
-  vec3 bg = mix(
-    vec3(0.05,0.15,0.2),
-    vec3(0.25,0.45,0.6),
-    uv.y
-  );
-
-  // ボタンUV
-  vec2 buv = (uv - btn.xy) / btn.zw - 0.5;
-
-  float mask = smoothstep(
-    0.02, -0.02,
-    roundedBox(buv, vec2(0.45,0.28), 0.25)
-  );
-
-  // 歪み（Liquid）
-  float n =
-    noise((uv+ t*0.05)*25.0) +
-    noise((uv- t*0.03)*40.0);
-
-  float e = 0.002;
-  float cx = noise((uv+vec2(e,0))*25.0 + t*0.5);
-  float cy = noise((uv+vec2(0,e))*25.0 + t*0.5);
-  vec2 normal = vec2(cx-n, cy-n);
-
-  float power = mix(0.015,0.04,h);
-  vec2 refractUV = uv + normal * power * mask;
-
-  vec3 glass = mix(
-    mix(
-      vec3(0.05,0.15,0.2),
-      vec3(0.25,0.45,0.6),
-      refractUV.y
-    ),
-    vec3(1.0),
-    0.18
-  );
-
-  // Fresnel
-  float fresnel = pow(1.0 - length(normal)*6.0, 3.0);
-  glass += fresnel * 0.4 * mask;
-
-  // 縁
-  float edge = smoothstep(0.0,0.08,mask)
-             - smoothstep(0.08,0.16,mask);
-
-  glass += edge * 0.3;
-
-  vec3 color = mix(bg, glass, mask);
-  float alpha = mix(1.0, 0.65, mask);
-
-  gl_FragColor = vec4(color, alpha);
-}
-`;
-
-function compile(type,src){
-  const s = gl.createShader(type);
-  gl.shaderSource(s,src);
-  gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){
-    console.error(gl.getShaderInfoLog(s));
-  }
-  return s;
-}
-
-const prog = gl.createProgram();
-gl.attachShader(prog, compile(gl.VERTEX_SHADER,vs));
-gl.attachShader(prog, compile(gl.FRAGMENT_SHADER,fs));
-gl.linkProgram(prog);
-gl.useProgram(prog);
-
-const buf = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER,buf);
-gl.bufferData(
-  gl.ARRAY_BUFFER,
-  new Float32Array([-1,-1,1,-1,-1,1,1,1]),
-  gl.STATIC_DRAW
-);
-
-const loc = gl.getAttribLocation(prog,"p");
-gl.enableVertexAttribArray(loc);
-gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-
-const tLoc = gl.getUniformLocation(prog,"t");
-const hLoc = gl.getUniformLocation(prog,"h");
-const rLoc = gl.getUniformLocation(prog,"res");
-const bLoc = gl.getUniformLocation(prog,"btn");
-
-function draw(time){
-  const rect = btn.getBoundingClientRect();
-  gl.uniform1f(tLoc, time*0.001);
-  gl.uniform1f(hLoc, hover);
-  gl.uniform2f(rLoc, canvas.width, canvas.height);
-  gl.uniform4f(
-    bLoc,
-    rect.left/canvas.width,
-    1.0-(rect.bottom/canvas.height),
-    rect.width/canvas.width,
-    rect.height/canvas.height
-  );
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-  requestAnimationFrame(draw);
-}
-draw(0);
-</script>
-
+  <script>
+    // ボタン生成
+    const btn = new Button({
+      text: 'Click Me',
+      size: 32,
+      type: 'rounded',
+      onClick: () => alert('Clicked!')
+    });
+    document.body.appendChild(btn.element);
+  </script>
 </body>
 </html>
